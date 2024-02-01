@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="utf-8" />
+   <title>p5.js Sketch</title>
+
+    <style>
+        /* Contents of style.css */
+        body { margin: 0; padding: 0; }
+        canvas { display: block; }
+        /* Additional CSS styles here */
+    </style>
+
+</head>
+<body>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/p5.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.1/addons/p5.sound.min.js"></script>
+   <script>
+       
+let audio;
+let WW, WH;
+let fft;
+let lookup = [];
+
+let segmentWidths = 300;
+let res = 100;
+let numSegments = 60;
+let segmentSpacing = 8;
+let specHistory = new Array(numSegments);
+let spectrumOffset = 0;
+let delay = 3 ;
+let delayToggle = false;
+let doFlash = 255;
+
+function mousePressed(){
+	doFlash = true;
+	delayToggle = !delayToggle;
+}
+
+function preload(){
+	audio = loadSound('sols.mp3');
+}
+
+function setup() {
+	createCanvas(windowWidth, windowHeight);
+	[WW, WH] = [windowWidth, windowHeight];
+	fft = new p5.FFT();
+	audio.play();
+	noiseDetail(3,2);
+	
+	// Fix very slight issue where horizontal lines meet the FFT.
+	strokeCap(ROUND);
+		
+	// fill up the arrays so we have something to render
+	initHistory();
+	initLookup();
+	background(0);
+}
+
+function initLookup(){
+	let e = 1.1918;
+	for(let i = 0; i < res; i++){
+		let x = (i - res/4) * 0.35;
+		lookup[i] = (1/sqrt(2*PI)) * pow(e, -0.5 * pow(x, 2)) * 80;
+	}
+}
+
+function initHistory(){
+	for(let s = 0; s < specHistory.length; s++){
+		specHistory[s] = new Array(res);
+		
+		for(let x = 0; x < res; x++){
+			specHistory[s][x] = 0;
+		}
+	}
+}
+
+
+function filterSpec(s){
+	let arr = [];
+	
+	// most of the spectrum doesn't have anything in it.
+	let clip = 700;
+	let sinWave = (sin((frameCount)/100 + spectrumOffset)+1)/2;
+	let offset = floor(map(sinWave, 0, 1, res, s.length-res-clip));
+	
+	for(let i = 0; i < res; i++){
+		s[i] = lookup[i] * s[i+offset]/40;
+		//* noise(i*11 + frameCount/50)*0.2;
+		
+		if(delayToggle){
+			s[i] *= (1+noise(frameCount/5)*0.3);
+		}
+		
+		arr.push(s[i]);
+	}
+	
+	s[0] = 0;
+	
+	return arr;
+}
+
+
+function draw() {
+	spec = fft.analyze();
+	let arr = filterSpec(spec);
+	
+	if(doFlash){
+		fade = 0;
+		doFlash = false;
+		noStroke();
+		fill(255);
+		rect(0,0,WW, WH);
+	}
+	else{
+		fade++;
+		fade = min(fade, 255);
+		fill(0, fade);
+		rect(0, 0, WW, WH);
+	}
+	
+	noStroke();
+	
+	// Move all the arrays down by 1
+	if(delayToggle === false){
+		specHistory.unshift(arr);
+		specHistory.length = numSegments;
+	}
+	else if(frameCount % delay === 0){
+		specHistory.unshift(arr);
+		// spectrumOffset++;
+		specHistory.length = numSegments;
+	}
+	
+	translate(WW/2 - 100, WH/2 - (numSegments * segmentSpacing)/2 + 50);
+	
+	strokeWeight(2);
+	stroke(255);
+
+	for(let i = 0; i < specHistory.length; i++){
+		push();
+		translate(0, i * segmentSpacing);
+		drawLine(specHistory[i]);
+		pop();
+	}
+}
+
+function drawLine(spec){
+	fill(0,fade);
+	stroke(255);
+	beginShape();
+	let x1, y1;
+	let x0, y0;
+	for(let i = 0; i < spec.length/2; i++){	
+		x0 = map(i, 0, spec.length/2, 0, segmentWidths);
+		y0 = map(spec[i], 0, 100, 0, -50);
+		x1 = map(i+1, 0, spec.length/2, 0, segmentWidths);
+		y1 = map(spec[i+1], 0, 100, 0, -50);
+		
+		vertex(x0,y0);
+		vertex(x1, y1);
+	}
+	
+	// start
+	line(-1, 0, 0-80, 1);
+	
+	// end
+	line(x1+1, 0, x1+80, 1);
+	
+	endShape();
+}
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+       
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
